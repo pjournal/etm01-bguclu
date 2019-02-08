@@ -1,4 +1,4 @@
-# The Progress Journal
+# Progress Journal Example Title
 
 ## Week 3 (Oct 24)
 
