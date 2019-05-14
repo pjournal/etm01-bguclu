@@ -1,0 +1,122 @@
+---
+title: "HW-3 Burhanettin Dumral"
+output: html_document
+---
+```{r }
+
+require(shiny)
+require(sp)
+require(data.table)
+require(tidyverse)
+require(lubridate)
+
+```
+
+**Reading matches data and manupulating**
+```{r }
+MatchesData=readRDS("C:\\Users\\burhan\\Desktop\\ETM 58D\\ETM 58D\\R (2)\\R\\df9b1196-e3cf-4cc7-9159-f236fe738215_matches.rds")
+MatchesData[,c("HomeScore","AwayScore"):=tstrsplit(score,":")]
+MatchesData[,HomeScore:=as.numeric(HomeScore)]
+MatchesData[,AwayScore:=as.numeric(AwayScore)]
+MatchesData[,totalgoals:=(HomeScore+AwayScore)]
+MatchesData[,timestamp:=as_datetime(date,tz='Turkey')]
+MatchesData=MatchesData[order(date)]
+MatchesData2=MatchesData[,Date:=as.Date(MatchesData$timestamp)]
+
+```
+**Decomposition of dates into seasons.**
+```{r }
+MatchesData2=MatchesData2[,Season:=ifelse(Date<"2011-06-30","2010-2011",
+                                   ifelse(Date<"2012-06-30","2011-2012",
+                                   ifelse(Date<"2013-06-30","2012-2013",
+                                   ifelse(Date<"2014-06-30","2013-2014",
+                                   ifelse(Date<"2015-06-30","2014-2015",
+                                   ifelse(Date<"2016-06-30","2015-2016",
+                                   ifelse(Date<"2017-06-30","2016-2017",
+                                   ifelse(Date<"2018-06-30","2017-2018",                                                ifelse(Date<"2019-06-30","2018-2019",0)
+                                   ))))))))]
+```
+
+**Fixing Team Names**
+```{r }
+sort(unique(MatchesData2$home))
+sort(unique(MatchesData2$away))
+MatchesData2[away=="crystal-palace",away:="crystal palace"]
+MatchesData2[away=="manchester-city",away:="manchester city"]
+MatchesData2[away=="newcastle utd",away:="newcastle"]
+MatchesData2[away=="stoke",away:="stoke city"]
+MatchesData2[away=="west-ham",away:="west ham"]
+MatchesData2[away %in% c('manchester-utd','manchester-united') ,away:='manchester united']
+MatchesData2[home=="crystal-palace",home:="crystal palace"]
+MatchesData2[home=="manchester-city",home:="manchester city"]
+MatchesData2[home=="newcastle utd",home:="newcastle"]
+MatchesData2[home=="stoke",home:="stoke city"]
+MatchesData2[home=="west-ham",home:="west ham"]
+MatchesData2[home %in% c('manchester-utd','manchester-united') ,home:='manchester united']
+
+```
+**Removig NA's**
+```{r }
+MatchesData2=MatchesData2[complete.cases(MatchesData2)]
+setDT(MatchesData2)
+```
+**Shiny App. In UserInterface,SidebarLayout was used. The app contains two scroll-down input section in which team and season desired to get looked at  are selected to see related results and statistics**
+```{r }
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        inputId = "teams",
+        label = "Select the team you want to see results of:",
+        choices = sort(unique(MatchesData2$home)),
+        selected = "arsenal"
+      ),
+      selectInput(
+        inputId = "seasons",
+        label = "Select the season:",
+        choices = unique(MatchesData2$Season),
+        selected = "2011-2012"
+      )),
+    
+    mainPanel(
+      dataTableOutput("result_table"),
+       plotOutput("average_goals")
+      
+    )))
+  
+
+ server <- function(input, output){
+    
+
+    
+    output$result_table <- renderDataTable({
+      table=MatchesData2[home ==input$teams | away==input$teams]
+      table2=table[Season==input$seasons]
+      table3=table2[,list(home,away,HomeScore,AwayScore,Date)]
+      table3
+    })
+    
+    
+    output$average_goals<- renderPlot({
+     table11=MatchesData2[home ==input$teams | away==input$teams]
+    table12=table11[Season==input$seasons]
+     table13=table12[,list(home,away,HomeScore,AwayScore,Date)]
+     table14=table13[,HomeOrAway:=ifelse(home==input$teams,"Home","Away")]
+     table15=table14[,Goals:=ifelse(HomeOrAway=="Home",HomeScore,AwayScore)]
+     
+    MeanResults=c(mean(table15[HomeOrAway=="Home"]$Goals),mean(table15[HomeOrAway=="Away"]$Goals),mean(table15$Goals))
+    HomeAway=c("Home","Away","Total")
+    
+    barplot(MeanResults,names.arg=HomeAway,xlab="Home-Away-Total",ylab="AverageGoals",col="yellow",
+            main="Average Goals Chart",border="red",ylim=c(0,3) )
+   
+      
+    })
+    
+  }
+  
+  
+  shinyApp(ui = ui, server = server)
+  
+
+```
